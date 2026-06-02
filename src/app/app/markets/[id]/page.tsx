@@ -78,7 +78,10 @@ export default function MarketDetailPage() {
     setError(null);
     fetchMarketData();
     // 30-second polling for live price updates
-    pollRef.current = setInterval(fetchMarketData, 30_000);
+    const intervalId = setInterval(() => {
+      fetchMarketData();
+    }, 30_000);
+    pollRef.current = intervalId;
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
