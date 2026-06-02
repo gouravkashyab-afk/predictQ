@@ -28,8 +28,8 @@ export default function Web3Provider({
           logo: "/logo.png",
           showWalletLoginFirst: false, // Show email/social first like Cobot.gg
         },
-        // Login methods
-        loginMethods: ["email", "google", "twitter", "wallet"],
+        // Login methods - Google temporarily disabled due to OAuth issues
+        loginMethods: ["email", "wallet"],
         // Embedded wallets - Multi-chain like Cobot.gg
         embeddedWallets: {
           createOnLogin: "users-without-wallets", // Auto-create wallet for email/social users
