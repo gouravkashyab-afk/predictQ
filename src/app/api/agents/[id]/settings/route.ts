@@ -5,11 +5,11 @@ const agentSettings: Record<string, any> = {};
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const agentId = params.id;
-    const settings = agentSettings[agentId] || {
+    const { id } = await params;
+    const settings = agentSettings[id] || {
       enabled: false,
       minPosition: 5,
       avgPosition: 5,
@@ -29,14 +29,14 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const agentId = params.id;
+    const { id } = await params;
     const body = await request.json();
 
     // Store settings (in production, save to database)
-    agentSettings[agentId] = {
+    agentSettings[id] = {
       enabled: body.enabled || false,
       minPosition: body.minPosition || 5,
       avgPosition: body.avgPosition || 5,
@@ -47,7 +47,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      settings: agentSettings[agentId],
+      settings: agentSettings[id],
     });
   } catch (error) {
     console.error("[POST /api/agents/[id]/settings]", error);

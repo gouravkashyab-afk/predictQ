@@ -223,6 +223,8 @@ export interface Market {
   new: boolean;
   yesTokenId: string;
   noTokenId: string;
+  eventId?: string;
+  eventTitle?: string;
   eventSlug?: string;
   groupItemTitle?: string;
   groupItemThreshold?: string;
