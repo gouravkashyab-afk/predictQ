@@ -2,12 +2,21 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import { polygon, mainnet, base, arbitrum, optimism } from "viem/chains";
+import { useEffect } from "react";
 
 export default function Web3Provider({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Debug: Log Privy App ID on mount
+  useEffect(() => {
+    const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+    console.log("[Privy Debug] App ID:", appId);
+    console.log("[Privy Debug] App ID length:", appId?.length);
+    console.log("[Privy Debug] Current URL:", window.location.href);
+  }, []);
+
   return (
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
