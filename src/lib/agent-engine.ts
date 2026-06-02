@@ -61,7 +61,38 @@ async function runSignalFollower(agent: Agent, config: AgentConfig) {
 
   let tradesPlaced = 0;
   for (const signal of freshSignals) {
-    const amount = Math.min(config.maxPositionSize, config.maxPositionSize * (signal.confidence / 100));
+    // Enhanced position sizing based on EV and edge
+    let amount = config.maxPositionSize;
+    
+    // If signal has EV data, adjust position size
+    const signalMetadata = signal.metadata as any;
+    if (signalMetadata?.expectedValue && signalMetadata?.edgePercentage) {
+      const ev = signalMetadata.expectedValue;
+      const edge = signalMetadata.edgePercentage;
+      
+      // Only trade positive EV signals
+      if (ev <= 0) {
+        await log(agent.id, "info", `Skipping negative EV signal: ${signal.question.slice(0, 60)}...`, {
+          ev,
+          confidence: signal.confidence,
+        });
+        continue;
+      }
+      
+      // Scale position size by EV and confidence
+      // High EV (>15%) + high confidence (>80%) = max position
+      // Lower EV or confidence = reduced position
+      const evMultiplier = Math.min(1.5, ev / 10); // Max 1.5x for EV > 15%
+      const edgeMultiplier = Math.min(1.2, edge / 15); // Max 1.2x for edge > 15%
+      
+      amount = Math.min(
+        config.maxPositionSize,
+        config.maxPositionSize * evMultiplier * edgeMultiplier * (signal.confidence / 100)
+      );
+    } else {
+      // Legacy: scale by confidence only
+      amount = Math.min(config.maxPositionSize, config.maxPositionSize * (signal.confidence / 100));
+    }
 
     const tradeId = randomUUID();
     await db.insert(agentTrades).values({
@@ -81,6 +112,8 @@ async function runSignalFollower(agent: Agent, config: AgentConfig) {
     await log(agent.id, "info", `Signal: ${signal.direction} on "${signal.question.slice(0, 60)}..."`, {
       confidence: signal.confidence,
       amount,
+      ev: signalMetadata?.expectedValue,
+      edge: signalMetadata?.edgePercentage,
       conditionId: signal.conditionId,
     });
 

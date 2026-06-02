@@ -41,6 +41,18 @@ export async function GET(request: NextRequest) {
         const inserted = [];
         for (const signal of fresh) {
           const id = randomUUID();
+          
+          // Prepare metadata with enhanced fields
+          const metadata = {
+            expectedValue: signal.expectedValue,
+            impliedProbability: signal.impliedProbability,
+            aiProbability: signal.aiProbability,
+            sentiment: signal.sentiment,
+            technicalSignal: signal.technicalSignal,
+            volumeMomentum: signal.volumeMomentum,
+            edgePercentage: signal.edgePercentage,
+          };
+          
           await db.insert(signals).values({
             id,
             conditionId: signal.conditionId,
@@ -53,6 +65,7 @@ export async function GET(request: NextRequest) {
             noPrice: signal.noPrice,
             volume: signal.volume,
             category: signal.category,
+            metadata, // Store enhanced fields
           });
           inserted.push({ id, ...signal, createdAt: new Date().toISOString() });
         }

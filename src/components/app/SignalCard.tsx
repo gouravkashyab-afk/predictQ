@@ -17,6 +17,14 @@ export interface SignalCardProps {
     volume: number;
     category: string;
     createdAt: string;
+    // Enhanced fields
+    expectedValue?: number;
+    impliedProbability?: number;
+    aiProbability?: number;
+    sentiment?: "bullish" | "bearish" | "neutral";
+    technicalSignal?: "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell";
+    volumeMomentum?: "increasing" | "stable" | "decreasing";
+    edgePercentage?: number;
   };
 }
 
@@ -44,6 +52,29 @@ export default function SignalCard({ signal }: SignalCardProps) {
       : signal.confidence >= 65
       ? "#f59e0b"
       : "#94a3b8";
+
+  // EV color coding
+  const evColor = 
+    !signal.expectedValue ? "#94a3b8" :
+    signal.expectedValue > 10 ? "#22c55e" :
+    signal.expectedValue > 0 ? "#f59e0b" :
+    "#ef4444";
+
+  // Technical signal display
+  const techSignalColor = {
+    strong_buy: "#22c55e",
+    buy: "#10b981",
+    neutral: "#94a3b8",
+    sell: "#f59e0b",
+    strong_sell: "#ef4444",
+  }[signal.technicalSignal ?? "neutral"];
+
+  // Sentiment emoji
+  const sentimentEmoji = {
+    bullish: "📈",
+    bearish: "📉",
+    neutral: "➡️",
+  }[signal.sentiment ?? "neutral"];
 
   return (
     <div className={`signal-card ${isYes ? "signal-yes" : "signal-no"}`} id={`signal-${signal.id}`}>
@@ -96,6 +127,76 @@ export default function SignalCard({ signal }: SignalCardProps) {
           <span className="price-pill-value">{formatVolume(signal.volume)}</span>
         </div>
       </div>
+
+      {/* Enhanced Metrics (EV, Edge, Sentiment) */}
+      {(signal.expectedValue !== undefined || signal.edgePercentage !== undefined) && (
+        <div className="signal-metrics" style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(3, 1fr)", 
+          gap: "0.5rem", 
+          marginTop: "0.75rem",
+          paddingTop: "0.75rem",
+          borderTop: "1px solid rgba(255,255,255,0.05)"
+        }}>
+          {signal.expectedValue !== undefined && (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                Expected Value
+              </div>
+              <div style={{ 
+                fontSize: "1rem", 
+                fontWeight: "600",
+                color: evColor
+              }}>
+                {signal.expectedValue > 0 ? '+' : ''}{signal.expectedValue.toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {signal.edgePercentage !== undefined && (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                Edge
+              </div>
+              <div style={{ 
+                fontSize: "1rem", 
+                fontWeight: "600",
+                color: signal.edgePercentage > 15 ? "#22c55e" : signal.edgePercentage > 10 ? "#f59e0b" : "#94a3b8"
+              }}>
+                {signal.edgePercentage.toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {signal.sentiment && (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                Sentiment
+              </div>
+              <div style={{ fontSize: "1rem", fontWeight: "600" }}>
+                {sentimentEmoji} {signal.sentiment}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Technical Signal Badge */}
+      {signal.technicalSignal && signal.technicalSignal !== "neutral" && (
+        <div style={{
+          marginTop: "0.5rem",
+          padding: "0.375rem 0.75rem",
+          background: `${techSignalColor}15`,
+          border: `1px solid ${techSignalColor}40`,
+          borderRadius: "0.5rem",
+          display: "inline-block",
+          fontSize: "0.75rem",
+          fontWeight: "600",
+          color: techSignalColor,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em"
+        }}>
+          {signal.technicalSignal.replace('_', ' ')}
+        </div>
+      )}
 
       {/* Reasoning */}
       <p className="signal-reasoning">{signal.reasoning}</p>

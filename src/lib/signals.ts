@@ -15,6 +15,115 @@ export interface SignalResult {
   noPrice: number;
   volume: number;
   category: string;
+  // Enhanced fields (Phase 1)
+  expectedValue?: number; // EV percentage (-100 to +100)
+  impliedProbability?: number; // Market's implied probability (0-1)
+  aiProbability?: number; // AI's estimated probability (0-1)
+  sentiment?: "bullish" | "bearish" | "neutral"; // Market sentiment
+  technicalSignal?: "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell";
+  volumeMomentum?: "increasing" | "stable" | "decreasing";
+  edgePercentage?: number; // Percentage edge over market (0-100)
+}
+
+// ─── Helper: Calculate Expected Value (EV) ───────────────────────────────────
+
+/**
+ * Calculate Expected Value for a trade
+ * EV = (ProbabilityWin × AmountWon) - (ProbabilityLose × AmountLost)
+ * 
+ * Example:
+ * - Market price: 60¢ (implied prob: 60%)
+ * - AI believes: 70% chance
+ * - If AI is right: EV = (0.7 × 40¢) - (0.3 × 60¢) = 28¢ - 18¢ = +10¢ (16.7% ROI)
+ */
+function calculateExpectedValue(
+  aiProbability: number, // AI's estimated probability (0-1)
+  marketPrice: number     // Current market price (0-1)
+): { ev: number; edgePercentage: number } {
+  // EV for buying YES at marketPrice
+  const potentialWin = 1 - marketPrice; // If win, get 1 - price
+  const potentialLoss = marketPrice;     // If lose, lose the price paid
+  
+  const ev = (aiProbability * potentialWin) - ((1 - aiProbability) * potentialLoss);
+  const evPercentage = (ev / marketPrice) * 100; // ROI percentage
+  
+  // Edge = difference between AI probability and market probability
+  const marketProbability = marketPrice;
+  const edgePercentage = Math.abs((aiProbability - marketProbability) * 100);
+  
+  return {
+    ev: evPercentage,
+    edgePercentage
+  };
+}
+
+// ─── Helper: Analyze Sentiment ───────────────────────────────────────────────
+
+/**
+ * Analyze market sentiment based on price action
+ * - Bullish: Price < 50% but AI thinks > 50%
+ * - Bearish: Price > 50% but AI thinks < 50%
+ * - Neutral: Agreement between market and AI
+ */
+function analyzeSentiment(
+  aiProbability: number,
+  marketPrice: number,
+  direction: "YES" | "NO"
+): "bullish" | "bearish" | "neutral" {
+  if (direction === "YES" && marketPrice < 0.5 && aiProbability > marketPrice) {
+    return "bullish"; // AI more optimistic than market
+  }
+  if (direction === "NO" && marketPrice > 0.5 && aiProbability < marketPrice) {
+    return "bearish"; // AI more pessimistic than market
+  }
+  if (Math.abs(aiProbability - marketPrice) < 0.1) {
+    return "neutral"; // Close agreement
+  }
+  return direction === "YES" ? "bullish" : "bearish";
+}
+
+// ─── Helper: Technical Signal ────────────────────────────────────────────────
+
+/**
+ * Generate technical trading signal based on:
+ * - Price extremes (oversold/overbought)
+ * - Edge percentage
+ * - Confidence level
+ */
+function generateTechnicalSignal(
+  marketPrice: number,
+  edgePercentage: number,
+  confidence: number
+): "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" {
+  // Strong signals: edge > 15% and confidence > 80%
+  if (edgePercentage > 15 && confidence > 80) {
+    return marketPrice < 0.3 ? "strong_buy" : marketPrice > 0.7 ? "strong_sell" : "buy";
+  }
+  
+  // Good signals: edge > 10% and confidence > 70%
+  if (edgePercentage > 10 && confidence > 70) {
+    return marketPrice < 0.4 ? "buy" : marketPrice > 0.6 ? "sell" : "neutral";
+  }
+  
+  // Moderate signals
+  if (edgePercentage > 5 && confidence > 60) {
+    return marketPrice < 0.5 ? "buy" : "sell";
+  }
+  
+  return "neutral";
+}
+
+// ─── Helper: Analyze Volume Momentum ─────────────────────────────────────────
+
+/**
+ * Determine volume momentum
+ * (Simplified version - in production, compare to historical average)
+ */
+function analyzeVolumeMomentum(volume: number): "increasing" | "stable" | "decreasing" {
+  // Simple heuristic: above $100K = increasing, $50K-$100K = stable, below = decreasing
+  if (volume > 100_000) return "increasing";
+  if (volume > 50_000) return "stable";
+  return "decreasing";
 }
 
 // ─── Mock signal generator (deterministic, no API key needed) ─────────────────
@@ -35,16 +144,32 @@ function mockSignal(market: {
     Math.max(55, Math.round(60 + Math.abs(yesPrice - 0.5) * 70))
   );
 
+  // Calculate AI probability (slightly different from market)
+  const aiProbability = direction === "YES" 
+    ? Math.min(0.95, yesPrice + 0.15) // AI thinks YES is more likely
+    : Math.max(0.05, yesPrice - 0.15); // AI thinks NO is more likely
+
+  // Calculate EV and edge
+  const { ev, edgePercentage } = calculateExpectedValue(
+    direction === "YES" ? aiProbability : (1 - aiProbability),
+    direction === "YES" ? yesPrice : (1 - yesPrice)
+  );
+
+  // Analyze sentiment and technicals
+  const sentiment = analyzeSentiment(aiProbability, yesPrice, direction);
+  const technicalSignal = generateTechnicalSignal(yesPrice, edgePercentage, confidence);
+  const volumeMomentum = analyzeVolumeMomentum(market.volume);
+
   const reasoningTemplates = {
     YES: [
-      `Current YES price of ${(yesPrice * 100).toFixed(0)}¢ appears undervalued given recent market momentum. Historical patterns suggest upward mean-reversion.`,
-      `Market participants may be underpricing this outcome. At ${(yesPrice * 100).toFixed(0)}¢, the risk/reward favors a YES position.`,
-      `Sentiment analysis indicates positive momentum. ${(yesPrice * 100).toFixed(0)}¢ entry provides ${confidence}% confidence upside.`,
+      `Current YES price of ${(yesPrice * 100).toFixed(0)}¢ appears undervalued. EV: ${ev.toFixed(1)}%. Edge: ${edgePercentage.toFixed(1)}%. ${sentiment === 'bullish' ? 'Bullish momentum detected.' : ''}`,
+      `Market participants may be underpricing this outcome. At ${(yesPrice * 100).toFixed(0)}¢, expected value is ${ev > 0 ? '+' : ''}${ev.toFixed(1)}% with ${edgePercentage.toFixed(0)}% edge.`,
+      `Sentiment analysis indicates ${sentiment} trend. ${(yesPrice * 100).toFixed(0)}¢ entry provides ${confidence}% confidence with ${ev > 0 ? 'positive' : 'negative'} EV.`,
     ],
     NO: [
-      `At ${(yesPrice * 100).toFixed(0)}¢, YES appears overbought. Mean reversion signals favor a NO position with ${confidence}% confidence.`,
-      `Recent price action shows exhaustion near current levels. NO position at ${(100 - yesPrice * 100).toFixed(0)}¢ offers favorable risk profile.`,
-      `Contrarian indicator triggered — high YES pricing creates opportunity for NO at ${(100 - yesPrice * 100).toFixed(0)}¢.`,
+      `At ${(yesPrice * 100).toFixed(0)}¢, YES appears overbought. NO position offers ${Math.abs(ev).toFixed(1)}% EV with ${edgePercentage.toFixed(0)}% edge over market.`,
+      `Recent price action shows ${sentiment} sentiment. NO position at ${(100 - yesPrice * 100).toFixed(0)}¢ offers ${technicalSignal} signal.`,
+      `Contrarian indicator triggered with ${edgePercentage.toFixed(0)}% edge. NO at ${(100 - yesPrice * 100).toFixed(0)}¢ provides ${confidence}% confidence.`,
     ],
   };
 
@@ -62,6 +187,14 @@ function mockSignal(market: {
     noPrice: market.noPrice,
     volume: market.volume,
     category: market.category,
+    // Enhanced fields
+    expectedValue: ev,
+    impliedProbability: yesPrice,
+    aiProbability,
+    sentiment,
+    technicalSignal,
+    volumeMomentum,
+    edgePercentage,
   };
 }
 
@@ -87,7 +220,7 @@ async function generateWithGPT(
     )
     .join("\n\n");
 
-  const prompt = `You are an expert prediction market analyst. Analyze these markets and provide trade signals.
+  const prompt = `You are an expert prediction market analyst. Analyze these markets and provide trade signals with Expected Value (EV) calculations.
 
 Markets:
 ${marketList}
@@ -97,14 +230,19 @@ For each market, respond with a JSON array of objects:
   "conditionId": "...",
   "direction": "YES" or "NO",
   "confidence": <integer 55-95>,
-  "reasoning": "<1-2 sentence analysis>"
+  "reasoning": "<1-2 sentence analysis with EV mention>",
+  "aiProbability": <float 0-1, your estimated probability of the direction winning>,
+  "sentiment": "bullish" or "bearish" or "neutral",
+  "edgePercentage": <integer 0-100, how much edge you have over market price>
 }
 
 Base your analysis on:
-- Current price relative to fair value
-- Market category fundamentals
+- Expected Value: Compare your probability estimate to market price
+- Edge calculation: aiProbability vs impliedProbability (market price)
+- Market category fundamentals and recent news
 - Volume and liquidity indicators
-- Contrarian vs momentum signals
+- Technical signals (oversold/overbought)
+- Contrarian vs momentum opportunities
 
 Return ONLY the JSON array, no other text.`;
 
@@ -117,7 +255,15 @@ Return ONLY the JSON array, no other text.`;
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";
-  let parsed: Array<{ conditionId: string; direction: string; confidence: number; reasoning: string }>;
+  let parsed: Array<{ 
+    conditionId: string; 
+    direction: string; 
+    confidence: number; 
+    reasoning: string;
+    aiProbability?: number;
+    sentiment?: string;
+    edgePercentage?: number;
+  }>;
 
   try {
     const obj = JSON.parse(content);
@@ -129,17 +275,38 @@ Return ONLY the JSON array, no other text.`;
 
   return parsed.map((p) => {
     const market = markets.find((m) => m.conditionId === p.conditionId) ?? markets[0];
+    const direction = p.direction === "NO" ? "NO" : "YES";
+    const confidence = Math.min(95, Math.max(50, p.confidence ?? 65));
+    
+    // Use AI probability from GPT or calculate from confidence
+    const aiProbability = p.aiProbability ?? (confidence / 100);
+    const marketPrice = direction === "YES" ? market.yesPrice : market.noPrice;
+    
+    // Calculate EV and technical indicators
+    const { ev, edgePercentage } = calculateExpectedValue(aiProbability, marketPrice);
+    const sentiment = p.sentiment as any ?? analyzeSentiment(aiProbability, market.yesPrice, direction);
+    const technicalSignal = generateTechnicalSignal(marketPrice, p.edgePercentage ?? edgePercentage, confidence);
+    const volumeMomentum = analyzeVolumeMomentum(market.volume);
+    
     return {
       conditionId: p.conditionId,
       question: market?.question ?? "",
-      direction: p.direction === "NO" ? "NO" : "YES",
-      confidence: Math.min(95, Math.max(50, p.confidence ?? 65)),
+      direction,
+      confidence,
       reasoning: p.reasoning ?? "",
       model: "gpt-4o",
       yesPrice: market?.yesPrice ?? 0,
       noPrice: market?.noPrice ?? 0,
       volume: market?.volume ?? 0,
       category: market?.category ?? "Other",
+      // Enhanced fields
+      expectedValue: ev,
+      impliedProbability: marketPrice,
+      aiProbability,
+      sentiment,
+      technicalSignal,
+      volumeMomentum,
+      edgePercentage: p.edgePercentage ?? edgePercentage,
     };
   });
 }

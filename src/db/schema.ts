@@ -99,6 +99,7 @@ export const signals = pgTable(
     noPrice: doublePrecision("no_price").default(0).notNull(),
     volume: doublePrecision("volume").default(0).notNull(),
     category: text("category").default("Other").notNull(),
+    metadata: jsonb("metadata").default({}).notNull(), // Enhanced fields: EV, edge, sentiment, etc.
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
