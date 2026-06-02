@@ -5,10 +5,6 @@ const nextConfig: NextConfig = {
     // Temporarily ignore build errors to deploy
     ignoreBuildErrors: true,
   },
-  eslint: {
-    // Temporarily ignore ESLint errors to deploy
-    ignoreDuringBuilds: true,
-  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "polymarket-upload.s3.us-east-2.amazonaws.com" },
@@ -23,9 +19,14 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" }, // Changed from DENY to SAMEORIGIN for Privy
           { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // Allow Privy iframe for authentication
+          { 
+            key: "Content-Security-Policy", 
+            value: "frame-ancestors 'self' https://auth.privy.io https://*.privy.io;" 
+          },
         ],
       },
       {
