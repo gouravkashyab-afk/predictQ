@@ -59,6 +59,13 @@ async function runSignalFollower(agent: Agent, config: AgentConfig) {
     return 0;
   }
 
+  await log(agent.id, "info", `Found ${freshSignals.length} signals to evaluate`, {
+    sources: freshSignals.reduce((acc: any, s: any) => {
+      acc[s.source || 'gpt4o'] = (acc[s.source || 'gpt4o'] || 0) + 1;
+      return acc;
+    }, {}),
+  });
+
   let tradesPlaced = 0;
   for (const signal of freshSignals) {
     // Enhanced position sizing based on EV and edge
@@ -210,6 +217,178 @@ async function runContrarian(agent: Agent, config: AgentConfig) {
   return tradesPlaced;
 }
 
+// ── Strategy: Allora Follower ──────────────────────────────────────────────────
+async function runAlloraFollower(agent: Agent, config: AgentConfig) {
+  await log(agent.id, "info", "Running allora_follower strategy - Using Allora Network predictions");
+
+  const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const alloraSignals = await db
+    .select()
+    .from(signals)
+    .where(
+      and(
+        eq(signals.source, "allora"), // ONLY Allora signals
+        gte(signals.confidence, config.minConfidence),
+        gte(signals.createdAt, cutoff)
+      )
+    )
+    .orderBy(desc(signals.confidence))
+    .limit(config.maxMarketsPerRun);
+
+  if (alloraSignals.length === 0) {
+    await log(agent.id, "info", "No Allora signals found. Run /api/allora/signals first.");
+    return 0;
+  }
+
+  await log(agent.id, "info", `Found ${alloraSignals.length} Allora-powered signals`, {
+    avgConfidence: Math.round(alloraSignals.reduce((sum, s) => sum + s.confidence, 0) / alloraSignals.length),
+  });
+
+  let tradesPlaced = 0;
+  for (const signal of alloraSignals) {
+    const metadata = signal.metadata as any;
+    
+    // Allora signals have enhanced metadata
+    const ev = metadata?.ev || 0;
+    const edge = metadata?.edge || 0;
+    const alloraPrediction = metadata?.alloraPrediction || 0;
+    const asset = metadata?.asset || 'Unknown';
+
+    // Only trade positive EV with significant edge
+    if (ev <= 0) {
+      await log(agent.id, "info", `Skipping negative EV Allora signal`, {
+        question: signal.question.slice(0, 50),
+        ev,
+      });
+      continue;
+    }
+
+    if (edge < 5) {
+      await log(agent.id, "info", `Skipping low edge Allora signal`, {
+        question: signal.question.slice(0, 50),
+        edge,
+      });
+      continue;
+    }
+
+    // Smart position sizing based on Allora confidence + EV + edge
+    const evMultiplier = Math.min(1.5, ev / 10);
+    const edgeMultiplier = Math.min(1.2, edge / 15);
+    const confidenceMultiplier = signal.confidence / 100;
+
+    const amount = Math.round(
+      config.maxPositionSize * evMultiplier * edgeMultiplier * confidenceMultiplier * 100
+    ) / 100;
+
+    await db.insert(agentTrades).values({
+      id: randomUUID(),
+      agentId: agent.id,
+      conditionId: signal.conditionId,
+      question: signal.question,
+      direction: signal.direction,
+      amountUsdc: amount,
+      confidence: signal.confidence,
+      signalId: signal.id,
+      status: "simulated",
+      createdAt: new Date(),
+    });
+
+    await log(agent.id, "info", `Allora signal executed: ${signal.direction}`, {
+      question: signal.question.slice(0, 60),
+      asset,
+      alloraPrediction,
+      confidence: signal.confidence,
+      ev: ev.toFixed(2),
+      edge: edge.toFixed(2),
+      amount,
+      technicalSignal: metadata?.technicalSignal,
+    });
+
+    tradesPlaced++;
+  }
+
+  return tradesPlaced;
+}
+
+// ── Strategy: Hybrid (Allora + GPT) ────────────────────────────────────────────
+async function runHybrid(agent: Agent, config: AgentConfig) {
+  await log(agent.id, "info", "Running hybrid strategy - Combining Allora + GPT-4o");
+
+  const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const hybridSignals = await db
+    .select()
+    .from(signals)
+    .where(
+      and(
+        eq(signals.source, "hybrid"),
+        gte(signals.confidence, config.minConfidence),
+        gte(signals.createdAt, cutoff)
+      )
+    )
+    .orderBy(desc(signals.confidence))
+    .limit(config.maxMarketsPerRun);
+
+  if (hybridSignals.length === 0) {
+    await log(agent.id, "info", "No hybrid signals available");
+    return 0;
+  }
+
+  let tradesPlaced = 0;
+  for (const signal of hybridSignals) {
+    const metadata = signal.metadata as any;
+    
+    // Hybrid signals should have both Allora and GPT data
+    const alloraEV = metadata?.alloraEV || 0;
+    const gptEV = metadata?.gptEV || 0;
+    const combinedEV = metadata?.combinedEV || 0;
+
+    // Both sources must agree (positive EV)
+    if (alloraEV <= 0 || gptEV <= 0) {
+      await log(agent.id, "info", "Skipping: Allora and GPT disagree", {
+        question: signal.question.slice(0, 50),
+        alloraEV,
+        gptEV,
+      });
+      continue;
+    }
+
+    // High confidence required for hybrid
+    if (signal.confidence < 75) {
+      continue;
+    }
+
+    const amount = Math.round(
+      config.maxPositionSize * (signal.confidence / 100) * 100
+    ) / 100;
+
+    await db.insert(agentTrades).values({
+      id: randomUUID(),
+      agentId: agent.id,
+      conditionId: signal.conditionId,
+      question: signal.question,
+      direction: signal.direction,
+      amountUsdc: amount,
+      confidence: signal.confidence,
+      signalId: signal.id,
+      status: "simulated",
+      createdAt: new Date(),
+    });
+
+    await log(agent.id, "info", `Hybrid consensus: ${signal.direction}`, {
+      question: signal.question.slice(0, 60),
+      alloraEV,
+      gptEV,
+      combinedEV,
+      confidence: signal.confidence,
+      amount,
+    });
+
+    tradesPlaced++;
+  }
+
+  return tradesPlaced;
+}
+
 // ── Main runner (called by /api/cron) ─────────────────────────────────────────
 export async function runAllActiveAgents(): Promise<{ agentId: string; trades: number }[]> {
   const activeAgents = await db
@@ -231,6 +410,12 @@ export async function runAllActiveAgents(): Promise<{ agentId: string; trades: n
         tradesPlaced = await runWhaleTracker(agent, config);
       } else if (agent.strategy === "contrarian") {
         tradesPlaced = await runContrarian(agent, config);
+      } else if (agent.strategy === "allora_follower") {
+        tradesPlaced = await runAlloraFollower(agent, config);
+      } else if (agent.strategy === "hybrid") {
+        tradesPlaced = await runHybrid(agent, config);
+      } else {
+        await log(agent.id, "warn", `Unknown strategy: ${agent.strategy}`);
       }
 
       // Update agent last run + trade count

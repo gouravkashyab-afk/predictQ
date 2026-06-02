@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@alloralabs/allora-sdk": "^0.1.1",
     "@neondatabase/serverless": "^1.1.0",
     "@privy-io/node": "^0.19.0",
     "@privy-io/react-auth": "^3.28.0",

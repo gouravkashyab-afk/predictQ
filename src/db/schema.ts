@@ -100,6 +100,8 @@ export const signals = pgTable(
     volume: doublePrecision("volume").default(0).notNull(),
     category: text("category").default("Other").notNull(),
     metadata: jsonb("metadata").default({}).notNull(), // Enhanced fields: EV, edge, sentiment, etc.
+    source: text("source").default("gpt4o").notNull(), // gpt4o | allora | hybrid
+    alloraInferenceId: text("allora_inference_id"), // Link to Allora inference
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -107,6 +109,7 @@ export const signals = pgTable(
     index("signals_direction_idx").on(t.direction),
     index("signals_confidence_idx").on(t.confidence),
     index("signals_created_idx").on(t.createdAt),
+    index("signals_source_idx").on(t.source),
   ]
 );
 
@@ -281,3 +284,55 @@ export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
 export type AgentTrade = typeof agentTrades.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;
+
+// ─── Allora Network Inferences ────────────────────────────────────────────────
+export const alloraInferences = pgTable(
+  "allora_inferences",
+  {
+    id: text("id").primaryKey(),
+    topicId: integer("topic_id").notNull(),
+    topicName: text("topic_name"),
+    asset: text("asset"), // 'BTC', 'ETH', 'SOL', etc.
+    timeframe: text("timeframe"), // '5m', '8h', '24h', etc.
+    networkInference: doublePrecision("network_inference").notNull(), // Weighted prediction
+    networkInferenceNormalized: doublePrecision("network_inference_normalized"),
+    confidenceScore: integer("confidence_score").notNull(), // 0-100
+    confidenceIntervalMin: doublePrecision("confidence_interval_min"),
+    confidenceIntervalMax: doublePrecision("confidence_interval_max"),
+    timestamp: integer("timestamp").notNull(), // Unix timestamp from Allora (use integer for bigint)
+    extraData: text("extra_data"), // JSON string
+    signature: text("signature"), // Cryptographic signature
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("allora_topic_timestamp_idx").on(t.topicId, t.timestamp),
+    index("allora_asset_created_idx").on(t.asset, t.createdAt),
+  ]
+);
+
+// ─── Allora Performance Tracking ──────────────────────────────────────────────
+export const alloraPerformance = pgTable(
+  "allora_performance",
+  {
+    id: text("id").primaryKey(),
+    topicId: integer("topic_id").notNull(),
+    predictionDate: timestamp("prediction_date", { withTimezone: true }).notNull(),
+    predictedValue: doublePrecision("predicted_value").notNull(),
+    actualValue: doublePrecision("actual_value"),
+    absoluteError: doublePrecision("absolute_error"),
+    percentageError: doublePrecision("percentage_error"),
+    wasCorrect: boolean("was_correct"),
+    confidenceScore: integer("confidence_score"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("allora_perf_topic_date_idx").on(t.topicId, t.predictionDate),
+  ]
+);
+
+export type AlloraInference = typeof alloraInferences.$inferSelect;
+export type NewAlloraInference = typeof alloraInferences.$inferInsert;
+export type AlloraPerformance = typeof alloraPerformance.$inferSelect;
+export type NewAlloraPerformance = typeof alloraPerformance.$inferInsert;
+
