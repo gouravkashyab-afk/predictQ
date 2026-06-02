@@ -15,6 +15,8 @@ function LoginContent() {
     },
     onError: (error) => {
       console.error("[Privy] Login error:", error);
+      console.error("[Privy] Error details:", JSON.stringify(error, null, 2));
+      alert(`Login failed: ${error.message || "Unknown error"}`);
     },
   });
 
