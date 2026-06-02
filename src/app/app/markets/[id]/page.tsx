@@ -80,7 +80,7 @@ export default function MarketDetailPage() {
     // 30-second polling for live price updates
     const intervalId = setInterval(() => {
       fetchMarketData();
-    }, 30_000);
+    }, 30_000) as any;
     pollRef.current = intervalId;
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
