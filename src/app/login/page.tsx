@@ -75,7 +75,7 @@ function LoginContent() {
 
         {/* Login Options */}
         <div className="login-options">
-          {/* Email/Social Login */}
+          {/* Email Login */}
           <button
             id="login-email-btn"
             className="login-option-btn primary"
@@ -83,8 +83,8 @@ function LoginContent() {
           >
             <Mail size={18} />
             <div className="login-option-content">
-              <span className="login-option-title">Continue with Email or Social</span>
-              <span className="login-option-subtitle">Google, Twitter, or Email</span>
+              <span className="login-option-title">Continue with Email</span>
+              <span className="login-option-subtitle">Sign in or create account</span>
             </div>
             <ArrowRight size={16} className="login-option-arrow" />
           </button>

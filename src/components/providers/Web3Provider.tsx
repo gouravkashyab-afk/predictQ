@@ -28,7 +28,7 @@ export default function Web3Provider({
           logo: "/logo.png",
           showWalletLoginFirst: false, // Show email/social first like Cobot.gg
         },
-        // Login methods - Google temporarily disabled due to OAuth issues
+        // Login methods - Focus on email and wallet for now
         loginMethods: ["email", "wallet"],
         // Embedded wallets - Multi-chain like Cobot.gg
         embeddedWallets: {
