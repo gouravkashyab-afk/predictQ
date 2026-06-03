@@ -1,0 +1,365 @@
+╔════════════════════════════════════════════════════════════════════╗
+║                                                                    ║
+║      PHASE 6A: PERFORMANCE TRACKING - COMPLETE ✅                 ║
+║                                                                    ║
+║          Real-Time P&L & Performance Metrics                       ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 WHAT WAS BUILT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEM: We could execute trades, but didn't know which agents were
+         profitable or which strategies worked best.
+
+SOLUTION: Complete performance tracking system that calculates:
+   ✅ Real-time P&L (realized + unrealized)
+   ✅ Win Rate (% of winning trades)
+   ✅ Sharpe Ratio (risk-adjusted returns)
+   ✅ Max Drawdown (worst loss from peak)
+   ✅ ROI (return on investment %)
+   ✅ Profit Factor (wins / losses ratio)
+   ✅ Agent leaderboard and rankings
+   ✅ Strategy comparison
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 DELIVERABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CORE ENGINE (1 file)
+   • src/lib/performance-tracker.ts    - P&L calculation engine
+
+✅ API ENDPOINTS (3 routes)
+   • GET  /api/agents/[id]/performance - Agent metrics
+   • GET  /api/performance/leaderboard - All agents comparison
+   • POST /api/webhook/polymarket       - Order status updates
+
+✅ UI COMPONENTS (2 files)
+   • PerformanceMetrics.tsx            - Metrics dashboard
+   • AgentLeaderboard.tsx              - Rankings & comparison
+
+✅ DATABASE (4 new tables)
+   • positions                         - Open/closed positions
+   • performance_snapshots             - Historical tracking
+   • signal_performance                - AI accuracy tracking
+   • Updated: trades, agents           - Added performance fields
+
+✅ DOCUMENTATION (2 files)
+   • PHASE_6A_PERFORMANCE_TRACKING.md  - Technical docs
+   • PHASE_6A_COMPLETE.txt             - This summary
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 KEY METRICS TRACKED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. P&L (Profit & Loss)
+   • Realized P&L:     Closed positions (actual profit)
+   • Unrealized P&L:   Open positions (paper profit)
+   • Total P&L:        Realized + Unrealized
+
+2. Win Rate
+   • Wins:             Number of profitable trades
+   • Losses:           Number of losing trades
+   • Win Rate %:       (Wins / Total) × 100
+
+3. Risk-Adjusted Returns
+   • Sharpe Ratio:     Return / Volatility
+     > 2.0 = Excellent
+     1.0-2.0 = Good
+     0-1.0 = Acceptable
+     < 0 = Poor
+
+4. Risk Metrics
+   • Max Drawdown:     Largest loss from peak
+   • Profit Factor:    Total Wins / Total Losses
+   • ROI:              (Total P&L / Invested) × 100
+
+5. Trade Analysis
+   • Average Win:      Mean profit of winning trades
+   • Average Loss:     Mean loss of losing trades
+   • Largest Win:      Best single trade
+   • Largest Loss:     Worst single trade
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRADE LIFECYCLE:
+
+1. Order Submitted
+   ├─ Status: pending
+   ├─ OrderHash: stored
+   └─ Waiting for fill...
+
+2. Polymarket Webhook: ORDER_FILLED
+   ├─ Update status: filled
+   ├─ Store entry price
+   ├─ Create position (status: open)
+   └─ Start tracking unrealized P&L
+
+3. Position Open
+   ├─ Current price updates
+   ├─ Calculate unrealized P&L
+   └─ Show in dashboard
+
+4. Position Closed
+   ├─ Store exit price
+   ├─ Calculate realized P&L
+   ├─ Update position (status: closed)
+   └─ Update agent stats
+
+5. Performance Calculated
+   ├─ Win rate updated
+   ├─ Sharpe ratio calculated
+   ├─ ROI computed
+   └─ Leaderboard updated
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 EXAMPLE METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Agent: "BTC Signal Follower"
+Strategy: signal_follower
+
+PERFORMANCE:
+   Total P&L:        +$245.50
+   Realized P&L:     +$180.00 (closed)
+   Unrealized P&L:   +$65.50 (open)
+
+WIN/LOSS:
+   Total Trades:     42
+   Wins:             28 (66.7% win rate) ← GOOD!
+   Losses:           14
+   
+   Average Win:      +$15.20
+   Average Loss:     -$8.50
+   Profit Factor:    1.79x ← Good (wins > losses)
+
+RISK METRICS:
+   Sharpe Ratio:     1.45 ← Good (1.0-2.0 range)
+   Max Drawdown:     -$45.00
+   ROI:              +12.5%
+
+GRADE: B (Good Performance)
+   ✅ Keep running this agent!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 UI COMPONENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. PerformanceMetrics Component
+   Shows for individual agent:
+   ┌─────────────────────────────────────────┐
+   │ 💰 Total P&L      🎯 Win Rate           │
+   │    +$245.50          66.7%              │
+   │                                         │
+   │ 📈 ROI           🔢 Total Trades        │
+   │    +12.5%            42                 │
+   ├─────────────────────────────────────────┤
+   │ Win/Loss Analysis                       │
+   │ • Avg Win:   +$15.20                    │
+   │ • Avg Loss:  -$8.50                     │
+   │ • Largest Win:  +$42.00                 │
+   │ • Profit Factor: 1.79x                  │
+   ├─────────────────────────────────────────┤
+   │ Risk Metrics                            │
+   │ • Sharpe Ratio: 1.45 (Good)             │
+   │ • Max Drawdown: -$45.00                 │
+   ├─────────────────────────────────────────┤
+   │ Performance Grade: B                    │
+   │ 👍 Good performance!                    │
+   └─────────────────────────────────────────┘
+
+2. AgentLeaderboard Component
+   Compares all agents:
+   ┌─────────────────────────────────────────┐
+   │ 🏆 Agent Leaderboard                    │
+   │ Sort: [P&L] [Win Rate] [ROI]           │
+   ├─────────────────────────────────────────┤
+   │ 🥇 BTC Follower   +$245  66.7%  12.5%  │
+   │ 🥈 ETH Tracker    +$180  62.0%  10.2%  │
+   │ 🥉 Whale Mirror   +$120  58.5%   8.1%  │
+   │ #4 Contrarian     +$50   45.0%   3.2%  │
+   ├─────────────────────────────────────────┤
+   │ Strategy Performance                    │
+   │ • Signal Follower: $450  (62% WR)       │
+   │ • Whale Tracker:   $320  (58% WR)       │
+   │ • Allora:          $280  (65% WR)       │
+   └─────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 DEPLOYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: Apply Database Migration
+   psql $DATABASE_URL < add_performance_tracking.sql
+
+STEP 2: Deploy Code
+   • Deploy all new files
+   • Restart API server
+
+STEP 3: Set Up Polymarket Webhook
+   • Go to Polymarket API settings
+   • Add webhook: https://your-domain.com/api/webhook/polymarket
+   • Select events: ORDER_FILLED, ORDER_CANCELLED, ORDER_EXPIRED
+   • Copy webhook secret
+   • Add to .env.local: POLYMARKET_WEBHOOK_SECRET=...
+
+STEP 4: Test
+   • Create test trade
+   • Simulate webhook (see docs)
+   • Check /api/agents/{id}/performance
+   • View performance in UI
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 BUSINESS IMPACT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE Phase 6A:
+   ❌ No way to measure agent performance
+   ❌ Don't know which strategies work
+   ❌ Can't optimize for profits
+   ❌ Users have no feedback on results
+
+AFTER Phase 6A:
+   ✅ Real-time performance tracking
+   ✅ Know exactly which agents are profitable
+   ✅ Can identify and scale winning strategies
+   ✅ Users see clear P&L and win rates
+   ✅ Data-driven decision making
+
+USER BENEFITS:
+   • See which agents make money
+   • Trust the system (transparency)
+   • Make informed decisions about agents
+   • Track performance over time
+
+PLATFORM BENEFITS:
+   • Identify what works → optimize
+   • Show users value → retention
+   • Data for marketing → proof of concept
+   • Foundation for auto-optimization
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 NEXT STEPS (Phase 6B)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Now that we track performance, we can:
+
+1. SIGNAL QUALITY ANALYSIS
+   • Which AI model is most accurate?
+   • Which confidence levels are best?
+   • Which market categories are profitable?
+   • Track signal accuracy over time
+
+2. AUTO-OPTIMIZATION
+   • Increase limits for winning agents
+   • Decrease limits for losing agents
+   • Auto-adjust confidence thresholds
+   • Dynamic capital allocation
+
+3. POSITION MANAGEMENT
+   • Take profit at +20% automatically
+   • Stop loss at -10% automatically
+   • Trailing stops
+   • Close positions early if confidence drops
+
+4. PORTFOLIO RISK MANAGEMENT
+   • Max % in any single market
+   • Correlation analysis (don't over-expose)
+   • Diversification requirements
+   • Dynamic risk adjustment
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ SUCCESS CRITERIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Core Engine:              COMPLETE
+✅ API Endpoints:             COMPLETE
+✅ UI Components:             COMPLETE
+✅ Database Schema:           COMPLETE
+✅ Webhook Handler:           COMPLETE
+✅ Documentation:             COMPLETE
+
+⏳ Database Migration:        PENDING (needs to be applied)
+⏳ Webhook Configuration:     PENDING (needs Polymarket setup)
+⏳ Testing with Real Trades:  PENDING (needs live data)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💻 QUICK TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Get agent performance
+curl http://localhost:3000/api/agents/{agentId}/performance
+
+# Get leaderboard
+curl http://localhost:3000/api/performance/leaderboard
+
+# Simulate webhook
+curl -X POST http://localhost:3000/api/webhook/polymarket \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "ORDER_FILLED",
+    "orderHash": "0xabc...",
+    "tokenId": "0x123...",
+    "price": 0.65,
+    "size": 50,
+    "status": "FILLED",
+    "timestamp": 1704123456789
+  }'
+
+# Check database
+psql $DATABASE_URL -c "SELECT * FROM positions LIMIT 10;"
+psql $DATABASE_URL -c "SELECT * FROM performance_snapshots ORDER BY snapshot_date DESC LIMIT 5;"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Read: PHASE_6A_PERFORMANCE_TRACKING.md
+   • Complete technical documentation
+   • API reference
+   • Integration guide
+   • Testing procedures
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 CONCLUSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Phase 6A is COMPLETE! ✅
+
+You now have:
+   ✅ Real-time P&L calculation
+   ✅ Comprehensive performance metrics
+   ✅ Agent leaderboard and rankings
+   ✅ Strategy comparison
+   ✅ Performance grading system
+   ✅ Webhook integration for order status
+   ✅ Beautiful UI components
+
+This enables you to:
+   📊 Track which agents are profitable
+   🎯 Identify winning strategies
+   💰 Optimize for maximum user profits
+   📈 Make data-driven decisions
+   🏆 Show users clear results
+
+Next Priority:
+   → Apply database migration
+   → Set up Polymarket webhook
+   → Test with real trades
+   → Build signal quality analysis (Phase 6B)
+
+╔════════════════════════════════════════════════════════════════════╗
+║                                                                    ║
+║   NOW YOU CAN MEASURE WHAT WORKS! 📊                              ║
+║                                                                    ║
+║   NEXT: Optimize based on performance data → More profits! 💰     ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝
+
+Created: June 2, 2026
+Status: COMPLETE ✅
+Ready for: Deployment & Testing
+Next Phase: 6B - Signal Quality Analysis & Auto-Optimization

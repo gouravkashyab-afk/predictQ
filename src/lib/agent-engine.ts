@@ -5,16 +5,22 @@
  */
 
 import { db } from "@/db/client";
-import { agents, agentTrades, agentLogs, signals, trades, whaleEvents } from "@/db/schema";
+import { agents, agentTrades, agentLogs, signals, trades, whaleEvents, markets } from "@/db/schema";
 import { eq, desc, gte, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type { Agent } from "@/db/schema";
+import { executeAgentTrade, canAgentTrade, getUserBalance } from "./wallet-manager";
+import { canExecuteTrade, shouldClosePosition, getUserPreferences, calculatePositionSize } from "./user-preferences";
+import { notifyTradeExecuted, notifyAlert } from "./notification-system";
 
 interface AgentConfig {
   maxPositionSize: number;   // max USDC per trade (default: 50)
   minConfidence: number;     // minimum signal confidence 0-100 (default: 70)
   maxMarketsPerRun: number;  // max trades per cron run (default: 3)
   riskLevel: "low" | "medium" | "high";
+  simulateOnly?: boolean;    // NEW: If true, don't execute real trades (default: true)
+  perTradeLimit?: number;    // NEW: Max $ per trade
+  dailyLimit?: number;       // NEW: Max $ per day
 }
 
 function defaultConfig(): AgentConfig {
@@ -35,6 +41,202 @@ async function log(
     metadata,
     createdAt: new Date(),
   }).catch(console.error);
+}
+
+// ── Helper: Execute trade (simulated or real) with user preference checks ──
+async function executeTrade(
+  agent: Agent,
+  signal: any,
+  amount: number,
+  direction: "YES" | "NO"
+): Promise<string> {
+  const config = agent.config as AgentConfig;
+  
+  // Get user preferences
+  const userPrefs = await getUserPreferences(agent.userId);
+  
+  // Check if trade is allowed based on user preferences
+  const canTrade = await canExecuteTrade(
+    agent.userId,
+    amount,
+    signal.category || "Other",
+    signal.confidence
+  );
+
+  if (!canTrade.allowed) {
+    await log(agent.id, "warn", `Trade blocked: ${canTrade.reason}`);
+    
+    // Notify user
+    await notifyAlert({
+      userId: agent.userId,
+      severity: "warning",
+      title: "Trade Blocked",
+      message: canTrade.reason || "Trade did not meet your risk preferences",
+    });
+    
+    return "blocked";
+  }
+
+  // Calculate dynamic position size based on preferences
+  const userBalance = await getUserBalance(agent.userId);
+  const dynamicAmount = calculatePositionSize(
+    userPrefs,
+    signal.confidence,
+    signal.metadata?.expectedValue || 0,
+    userBalance
+  );
+
+  // Use the smaller of: calculated amount or original amount
+  const finalAmount = Math.min(amount, dynamicAmount);
+
+  const simulateOnly = userPrefs.paperTradingMode || config?.simulateOnly !== false;
+
+  const tradeId = randomUUID();
+
+  if (simulateOnly) {
+    // Simulated trade
+    await db.insert(agentTrades).values({
+      id: tradeId,
+      agentId: agent.id,
+      conditionId: signal.conditionId,
+      question: signal.question,
+      direction,
+      amountUsdc: finalAmount,
+      confidence: signal.confidence,
+      signalId: signal.id,
+      status: "simulated",
+      createdAt: new Date(),
+    });
+
+    // Notify user
+    await notifyTradeExecuted({
+      userId: agent.userId,
+      agentName: agent.name,
+      question: signal.question,
+      direction,
+      amount: finalAmount,
+      confidence: signal.confidence,
+      isSimulated: true,
+    });
+
+    return tradeId;
+  }
+
+  // REAL TRADE
+  try {
+    // Check if agent can trade
+    const canTrade = await canAgentTrade(agent.id);
+    if (!canTrade) {
+      await log(agent.id, "warn", "Agent cannot trade (permissions)");
+      // Fall back to simulated
+      await db.insert(agentTrades).values({
+        id: tradeId,
+        agentId: agent.id,
+        conditionId: signal.conditionId,
+        question: signal.question,
+        direction,
+        amountUsdc: amount,
+        confidence: signal.confidence,
+        signalId: signal.id,
+        status: "simulated",
+        createdAt: new Date(),
+      });
+      return tradeId;
+    }
+
+    // Check balance
+    const balance = await getUserBalance(agent.userId);
+    if (balance < amount) {
+      await log(agent.id, "warn", `Insufficient balance ($${balance.toFixed(2)} < $${amount})`);
+      // Fall back to simulated
+      await db.insert(agentTrades).values({
+        id: tradeId,
+        agentId: agent.id,
+        conditionId: signal.conditionId,
+        question: signal.question,
+        direction,
+        amountUsdc: amount,
+        confidence: signal.confidence,
+        signalId: signal.id,
+        status: "simulated",
+        createdAt: new Date(),
+      });
+      return tradeId;
+    }
+
+    // Get token ID from market
+    const market = await db
+      .select()
+      .from(markets)
+      .where(eq(markets.conditionId, signal.conditionId))
+      .limit(1);
+
+    if (!market || market.length === 0) {
+      throw new Error('Market not found');
+    }
+
+    // Execute real trade
+    const tokenId = direction === 'YES' ? market[0].yesTokenId : market[0].noTokenId;
+    const price = direction === 'YES' ? signal.yesPrice : signal.noPrice;
+
+    if (!tokenId) {
+      throw new Error('Token ID not found');
+    }
+
+    const result = await executeAgentTrade({
+      agentId: agent.id,
+      userId: agent.userId,
+      tokenId,
+      price,
+      size: amount,
+      side: 'BUY', // Agents always buy (either YES or NO)
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Trade execution failed');
+    }
+
+    // Store trade in database with order hash
+    await db.insert(agentTrades).values({
+      id: tradeId,
+      agentId: agent.id,
+      conditionId: signal.conditionId,
+      question: signal.question,
+      direction,
+      amountUsdc: amount,
+      confidence: signal.confidence,
+      signalId: signal.id,
+      status: "pending", // ← REAL TRADE
+      orderHash: result.orderHash,
+      createdAt: new Date(),
+    });
+
+    await log(agent.id, "info", `✅ REAL TRADE executed: ${direction}`, {
+      amount,
+      orderHash: result.orderHash,
+      question: signal.question.slice(0, 60),
+    });
+
+    return tradeId;
+  } catch (error) {
+    await log(agent.id, "error", `Trade execution failed: ${String(error)}`);
+
+    // Fall back to simulated on error
+    await db.insert(agentTrades).values({
+      id: tradeId,
+      agentId: agent.id,
+      conditionId: signal.conditionId,
+      question: signal.question,
+      direction,
+      amountUsdc: amount,
+      confidence: signal.confidence,
+      signalId: signal.id,
+      status: "failed",
+      createdAt: new Date(),
+    });
+
+    return tradeId;
+  }
 }
 
 // ── Strategy: Signal Follower ──────────────────────────────────────────────────
@@ -101,20 +303,8 @@ async function runSignalFollower(agent: Agent, config: AgentConfig) {
       amount = Math.min(config.maxPositionSize, config.maxPositionSize * (signal.confidence / 100));
     }
 
-    const tradeId = randomUUID();
-    await db.insert(agentTrades).values({
-      id: randomUUID(),
-      agentId: agent.id,
-      tradeId,
-      conditionId: signal.conditionId,
-      question: signal.question,
-      direction: signal.direction,
-      amountUsdc: Math.round(amount * 100) / 100,
-      confidence: signal.confidence,
-      signalId: signal.id,
-      status: "simulated", // agents simulate until real wallet signing is wired
-      createdAt: new Date(),
-    });
+    // Execute trade (simulated or real based on config)
+    await executeTrade(agent, signal, Math.round(amount * 100) / 100, signal.direction);
 
     await log(agent.id, "info", `Signal: ${signal.direction} on "${signal.question.slice(0, 60)}..."`, {
       confidence: signal.confidence,

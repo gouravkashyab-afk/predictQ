@@ -250,7 +250,8 @@ export const agentTrades = pgTable(
     amountUsdc: doublePrecision("amount_usdc").notNull(),
     confidence: integer("confidence").notNull(),
     signalId: text("signal_id"),
-    status: text("status").default("pending").notNull(),
+    status: text("status").default("pending").notNull(), // pending|filled|failed|cancelled|simulated
+    orderHash: text("order_hash"), // Polymarket order ID for real trades
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -335,4 +336,95 @@ export type AlloraInference = typeof alloraInferences.$inferSelect;
 export type NewAlloraInference = typeof alloraInferences.$inferInsert;
 export type AlloraPerformance = typeof alloraPerformance.$inferSelect;
 export type NewAlloraPerformance = typeof alloraPerformance.$inferInsert;
+
+// ─── Positions (Open/Closed Trading Positions) ────────────────────────────────
+export const positions = pgTable(
+  "positions",
+  {
+    id: text("id").primaryKey(),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    tradeId: text("trade_id").references(() => trades.id, { onDelete: "set null" }),
+    conditionId: text("condition_id").notNull(),
+    question: text("question").notNull(),
+    direction: text("direction").notNull(), // YES | NO
+    tokenId: text("token_id").notNull(),
+    entryPrice: doublePrecision("entry_price").notNull(),
+    currentPrice: doublePrecision("current_price").notNull(),
+    shares: doublePrecision("shares").notNull(),
+    amountUsdc: doublePrecision("amount_usdc").notNull(),
+    unrealizedPnl: doublePrecision("unrealized_pnl").default(0).notNull(),
+    status: text("status").default("open").notNull(), // open | closed
+    openedAt: timestamp("opened_at", { withTimezone: true }).defaultNow().notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("positions_agent_idx").on(t.agentId),
+    index("positions_status_idx").on(t.status),
+    index("positions_condition_idx").on(t.conditionId),
+  ]
+);
+
+// ─── Performance Snapshots (Historical Tracking) ───────────────────────────────
+export const performanceSnapshots = pgTable(
+  "performance_snapshots",
+  {
+    id: text("id").primaryKey(),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    snapshotDate: timestamp("snapshot_date", { withTimezone: true }).defaultNow().notNull(),
+    totalTrades: integer("total_trades").default(0).notNull(),
+    wins: integer("wins").default(0).notNull(),
+    losses: integer("losses").default(0).notNull(),
+    winRate: doublePrecision("win_rate").default(0).notNull(),
+    totalPnl: doublePrecision("total_pnl").default(0).notNull(),
+    realizedPnl: doublePrecision("realized_pnl").default(0).notNull(),
+    unrealizedPnl: doublePrecision("unrealized_pnl").default(0).notNull(),
+    sharpeRatio: doublePrecision("sharpe_ratio").default(0).notNull(),
+    maxDrawdown: doublePrecision("max_drawdown").default(0).notNull(),
+    roi: doublePrecision("roi").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("perf_snapshots_agent_date_idx").on(t.agentId, t.snapshotDate),
+  ]
+);
+
+// ─── Signal Performance (AI Model Accuracy Tracking) ───────────────────────────
+export const signalPerformance = pgTable(
+  "signal_performance",
+  {
+    id: text("id").primaryKey(),
+    signalId: text("signal_id")
+      .notNull()
+      .references(() => signals.id, { onDelete: "cascade" }),
+    agentId: text("agent_id"),
+    wasTraded: boolean("was_traded").default(false).notNull(),
+    tradeId: text("trade_id").references(() => trades.id, { onDelete: "set null" }),
+    predictedDirection: text("predicted_direction").notNull(), // YES | NO
+    predictedConfidence: integer("predicted_confidence").notNull(),
+    predictedEv: doublePrecision("predicted_ev"),
+    actualOutcome: text("actual_outcome"), // YES | NO | null
+    wasCorrect: boolean("was_correct"),
+    actualPnl: doublePrecision("actual_pnl"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("signal_perf_signal_idx").on(t.signalId),
+    index("signal_perf_agent_idx").on(t.agentId),
+    index("signal_perf_outcome_idx").on(t.wasCorrect),
+  ]
+);
+
+export type Position = typeof positions.$inferSelect;
+export type NewPosition = typeof positions.$inferInsert;
+export type PerformanceSnapshot = typeof performanceSnapshots.$inferSelect;
+export type NewPerformanceSnapshot = typeof performanceSnapshots.$inferInsert;
+export type SignalPerformance = typeof signalPerformance.$inferSelect;
+export type NewSignalPerformance = typeof signalPerformance.$inferInsert;
 
