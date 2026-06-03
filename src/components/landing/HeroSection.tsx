@@ -85,9 +85,9 @@ export default function HeroSection() {
         />
 
         {/* Content */}
-        <div className="absolute inset-0 z-20 flex flex-col justify-center px-6 sm:px-12 pt-24">
+        <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-center px-6 sm:px-12 pt-24">
           {/* Badge */}
-          <div className="mb-6 flex">
+          <div className="mb-6">
             <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-medium tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
               Now live on Polymarket
@@ -101,12 +101,11 @@ export default function HeroSection() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500">
               Market
             </span>{" "}
-            <br className="sm:hidden" />
             Aggregator
           </h1>
 
           {/* Sub-headline */}
-          <p className="text-lg sm:text-2xl font-light text-white/70 mb-6 max-w-xl">
+          <p className="text-lg sm:text-2xl font-light text-white/70 mb-6 max-w-2xl">
             Trade like a{" "}
             <span className="text-yellow-300 font-semibold bg-yellow-300/10 px-2 py-0.5 rounded">
               pro
@@ -115,9 +114,9 @@ export default function HeroSection() {
           </p>
 
           {/* Feature list */}
-          <div className="feature-list mb-10 max-w-sm">
+          <div className="feature-list mb-10 mx-auto">
             {features.map(({ icon: Icon, label }) => (
-              <div key={label} className="feature-item">
+              <div key={label} className="feature-item justify-center">
                 <div className="feature-dot" />
                 <span className="text-white/80 text-sm sm:text-base font-light">{label}</span>
               </div>
@@ -125,7 +124,7 @@ export default function HeroSection() {
           </div>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/app" id="start-trading" className="btn-yellow">
               <ArrowUpRight size={16} />
               Start Trading
@@ -138,7 +137,7 @@ export default function HeroSection() {
 
         {/* Big watermark text */}
         <h2
-          className="absolute bottom-8 right-4 sm:right-8 z-10 font-zilla font-black uppercase text-white/[0.04]"
+          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 font-zilla font-black uppercase text-white/[0.04] text-center"
           style={{ fontSize: "clamp(3rem, 12vw, 9rem)", lineHeight: 1, letterSpacing: "-0.02em", pointerEvents: "none" }}
           aria-hidden
         >
